@@ -1,0 +1,24 @@
+{
+  "name": "token-board-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "token-board": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@token-board/collectors": "0.1.0",
+    "@token-board/core": "0.1.0",
+    "@token-board/renderer": "0.1.0",
+    "commander": "^13.1.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  }
+}

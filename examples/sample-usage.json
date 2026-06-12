@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "timezone": "Asia/Shanghai",
+  "records": [
+    {
+      "date": "2026-06-01",
+      "platform": "cursor",
+      "inputTokens": 120000,
+      "outputTokens": 45000,
+      "totalTokens": 165000,
+      "source": "local",
+      "collectedAt": "2026-06-01T16:00:00.000Z"
+    },
+    {
+      "date": "2026-06-02",
+      "platform": "codex",
+      "inputTokens": 80000,
+      "outputTokens": 22000,
+      "totalTokens": 102000,
+      "source": "local",
+      "collectedAt": "2026-06-02T16:00:00.000Z"
+    },
+    {
+      "date": "2026-06-03",
+      "platform": "claude",
+      "inputTokens": 95000,
+      "outputTokens": 31000,
+      "totalTokens": 126000,
+      "source": "local",
+      "collectedAt": "2026-06-03T16:00:00.000Z"
+    }
+  ]
+}

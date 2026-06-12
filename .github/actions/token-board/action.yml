@@ -1,0 +1,14 @@
+name: Token Board
+description: Collect AI token usage and update profile heatmap SVG
+inputs:
+  since:
+    description: Lookback window for collection (e.g. 365d)
+    required: false
+    default: 365d
+  config:
+    description: Path to token-board config file
+    required: false
+    default: ""
+runs:
+  using: node20
+  main: ../../action/dist/index.js

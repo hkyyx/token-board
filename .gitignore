@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+coverage/
+
+# Local collected usage and generated SVG (use examples/ for samples)
+/data/
+/assets/token-activity.svg
+/config.example.yaml

@@ -1,0 +1,4 @@
+date,platform,input_tokens,output_tokens,cost_usd,model
+2026-06-10,deepseek,12000,3400,0.05,deepseek-v3
+2026-06-11,kimi,8000,2100,0.03,moonshot-v1
+2026-06-11,qwen,5600,1800,,qwen-max

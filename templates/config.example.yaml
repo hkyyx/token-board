@@ -1,0 +1,30 @@
+timezone: Asia/Shanghai
+dataPath: ./data/usage.json
+outputPath: ./assets/token-activity.svg
+
+github:
+  owner: YOUR_GITHUB_USERNAME
+  repo: YOUR_GITHUB_USERNAME
+  branch: main
+  svgPath: assets/token-activity.svg
+
+platforms:
+  cursor:
+    enabled: true
+  codex:
+    enabled: true
+  claude:
+    enabled: true
+  openai:
+    enabled: false
+  anthropic:
+    enabled: false
+
+publish:
+  includeCost: false
+  includeModels: false
+
+# Optional API keys (prefer GitHub Secrets in CI)
+# api:
+#   openaiApiKey: sk-...
+#   anthropicAdminKey: sk-ant-admin-...
