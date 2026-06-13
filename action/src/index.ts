@@ -2,7 +2,7 @@ import * as core from "@actions/core";
 import { exec } from "@actions/exec";
 
 async function run(): Promise<void> {
-  const days = core.getInput("days") || "30";
+  const days = core.getInput("days") || "365";
   const configPath = core.getInput("config") || "";
 
   const configFlag = configPath ? `--config ${configPath}` : "";

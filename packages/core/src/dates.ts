@@ -1,6 +1,6 @@
 export const MIN_LOOKBACK_DAYS = 7;
 export const MAX_LOOKBACK_DAYS = 365;
-export const DEFAULT_LOOKBACK_DAYS = 30;
+export const DEFAULT_LOOKBACK_DAYS = 365;
 
 export function clampDays(days: number): number {
   const rounded = Math.floor(days);

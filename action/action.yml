@@ -4,7 +4,7 @@ inputs:
   days:
     description: Number of days to collect and display (7-365)
     required: false
-    default: "30"
+    default: "365"
   config:
     description: Path to token-board config file
     required: false

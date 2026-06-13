@@ -57,7 +57,7 @@ program
   .option(
     "-d, --days <number>",
     "Number of days to collect and display (7-365)",
-    "30",
+    "365",
   );
 
 program

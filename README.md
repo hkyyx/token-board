@@ -24,7 +24,7 @@ npx token-board init
 npx token-board detect
 
 # Collect usage from local tools
-npx token-board collect --days 30
+npx token-board collect --days 365
 
 # Optional: import domestic agent CSV
 npx token-board import templates/domestic-agents.example.csv
@@ -121,7 +121,7 @@ For Cursor/Codex/Claude local data, run collection on a **self-hosted runner** o
 |---|---|
 | `token-board init` | Create config + workflow template |
 | `token-board detect` | List detected platforms |
-| `token-board collect [--days 30]` | Collect from enabled sources (7–365 days) |
+| `token-board collect [--days 365]` | Collect from enabled sources (7–365 days) |
 | `token-board import <file.csv>` | Import CSV rows |
 | `token-board render [--year 2026]` | Generate SVG heatmap |
 | `token-board publish` | Render SVG + public JSON manifest |

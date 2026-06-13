@@ -22,13 +22,13 @@ jobs:
         run: npm ci
 
       - name: Collect usage
-        run: npx token-board collect --days 30
+        run: npx token-board collect --days 365
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_ADMIN_KEY: ${{ secrets.ANTHROPIC_ADMIN_KEY }}
 
       - name: Render and publish artifacts
-        run: npx token-board publish --days 30
+        run: npx token-board publish --days 365
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v5
