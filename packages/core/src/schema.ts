@@ -32,6 +32,7 @@ export interface UsageStore {
 
 export interface TokenBoardConfig {
   timezone: string;
+  days?: number;
   dataPath: string;
   outputPath: string;
   github?: {

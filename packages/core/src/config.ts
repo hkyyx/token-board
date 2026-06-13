@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import path from "node:path";
+import { DEFAULT_LOOKBACK_DAYS, parseDaysArg } from "./dates.js";
 import type { TokenBoardConfig } from "./schema.js";
 
 export const DEFAULT_CONFIG_DIR = path.join(
@@ -13,6 +14,7 @@ export const DEFAULT_CONFIG_PATH = path.join(DEFAULT_CONFIG_DIR, "config.yaml");
 export function defaultConfig(cwd = process.cwd()): TokenBoardConfig {
   return {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    days: DEFAULT_LOOKBACK_DAYS,
     dataPath: path.join(cwd, "data", "usage.json"),
     outputPath: path.join(cwd, "assets", "token-activity.svg"),
     platforms: {
@@ -41,9 +43,11 @@ export async function loadConfig(configPath?: string): Promise<TokenBoardConfig>
   try {
     const raw = await readFile(resolved, "utf8");
     const parsed = parse(raw) as Partial<TokenBoardConfig>;
+    const base = defaultConfig(path.dirname(path.dirname(resolved)));
     return {
-      ...defaultConfig(path.dirname(path.dirname(resolved))),
+      ...base,
       ...parsed,
+      days: parseDaysArg(parsed.days, base.days),
       platforms: {
         ...defaultConfig().platforms,
         ...parsed.platforms,

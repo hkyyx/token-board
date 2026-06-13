@@ -5,7 +5,7 @@ Track daily AI token usage across Cursor, Codex, Claude Code, OpenAI, Anthropic,
 ## Features
 
 - **Multi-platform collection**: local logs (Cursor, Codex, Claude Code) + API (OpenAI, Anthropic) + CSV import
-- **GitHub-style heatmap**: 365-day SVG with streaks and platform breakdown
+- **GitHub-style heatmap**: configurable 7–365 day SVG with streaks and platform breakdown
 - **Profile publishing**: render SVG + sanitized JSON for your `username/username` repo
 - **GitHub Action**: daily automated updates
 
@@ -24,7 +24,7 @@ npx token-board init
 npx token-board detect
 
 # Collect usage from local tools
-npx token-board collect --since 365d
+npx token-board collect --days 30
 
 # Optional: import domestic agent CSV
 npx token-board import templates/domestic-agents.example.csv
@@ -121,7 +121,7 @@ For Cursor/Codex/Claude local data, run collection on a **self-hosted runner** o
 |---|---|
 | `token-board init` | Create config + workflow template |
 | `token-board detect` | List detected platforms |
-| `token-board collect [--since 7d]` | Collect from enabled sources |
+| `token-board collect [--days 30]` | Collect from enabled sources (7–365 days) |
 | `token-board import <file.csv>` | Import CSV rows |
 | `token-board render [--year 2026]` | Generate SVG heatmap |
 | `token-board publish` | Render SVG + public JSON manifest |

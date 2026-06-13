@@ -1,4 +1,5 @@
 timezone: Asia/Shanghai
+days: 30
 dataPath: ./data/usage.json
 outputPath: ./assets/token-activity.svg
 

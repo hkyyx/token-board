@@ -1,10 +1,10 @@
 name: Token Board
 description: Collect AI token usage and update profile heatmap SVG
 inputs:
-  since:
-    description: Lookback window for collection (e.g. 365d)
+  days:
+    description: Number of days to collect and display (7-365)
     required: false
-    default: 365d
+    default: "30"
   config:
     description: Path to token-board config file
     required: false

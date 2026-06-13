@@ -4,6 +4,7 @@ import {
   aggregateByPlatform,
   computeStreaks,
   dateRange,
+  DEFAULT_LOOKBACK_DAYS,
   sumTokens,
 } from "@token-board/core";
 
@@ -25,6 +26,7 @@ export const DEFAULT_THEME: HeatmapTheme = {
 
 export interface RenderOptions {
   year?: number;
+  days?: number;
   timezone?: string;
   theme?: HeatmapTheme;
   title?: string;
@@ -36,6 +38,19 @@ export interface HeatmapStats {
   currentStreak: number;
   longestStreak: number;
   platforms: Array<{ platform: string; label: string; tokens: number; share: number }>;
+}
+
+type LayoutMode = "strip" | "stacked" | "wide";
+
+interface HeatmapGeometry {
+  mode: LayoutMode;
+  cell: number;
+  gap: number;
+  weeks: number;
+  gridWidth: number;
+  gridHeight: number;
+  contentWidth: number;
+  padding: number;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -58,12 +73,86 @@ const PLATFORM_COLORS: Record<string, string> = {
   custom: "#94a3b8",
 };
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
 function platformLabel(platform: string): string {
   return PLATFORM_LABELS[platform] ?? platform;
 }
 
 function platformColor(platform: string): string {
   return PLATFORM_COLORS[platform] ?? "#58a6ff";
+}
+
+function resolveLayoutMode(days: number): LayoutMode {
+  if (days <= 45) return "strip";
+  if (days <= 120) return "stacked";
+  return "wide";
+}
+
+function computeGeometry(days: number): HeatmapGeometry {
+  const padding = 20;
+  const gap = 3;
+  const weeks = Math.ceil(days / 7);
+  const mode = resolveLayoutMode(days);
+
+  if (mode === "strip") {
+    const contentWidth = Math.max(520, Math.min(860, padding * 2 + days * 18));
+    const cell = Math.min(
+      22,
+      Math.max(
+        10,
+        Math.floor((contentWidth - padding * 2 - (days - 1) * gap) / days),
+      ),
+    );
+    const gridWidth = days * (cell + gap) - gap;
+    return {
+      mode,
+      cell,
+      gap,
+      weeks,
+      gridWidth,
+      gridHeight: cell,
+      contentWidth: Math.max(contentWidth, gridWidth + padding * 2),
+      padding,
+    };
+  }
+
+  if (mode === "stacked") {
+    const contentWidth = 720;
+    const cell = Math.min(
+      18,
+      Math.max(13, Math.floor((contentWidth - padding * 2) / weeks - gap)),
+    );
+    const gridWidth = weeks * (cell + gap);
+    const gridHeight = 7 * (cell + gap);
+    return {
+      mode,
+      cell,
+      gap,
+      weeks,
+      gridWidth,
+      gridHeight,
+      contentWidth,
+      padding,
+    };
+  }
+
+  const cell = 12;
+  const gridWidth = weeks * (cell + gap);
+  const gridHeight = 7 * (cell + gap);
+  return {
+    mode,
+    cell,
+    gap,
+    weeks,
+    gridWidth,
+    gridHeight,
+    contentWidth: gridWidth + 300,
+    padding,
+  };
 }
 
 function aggregateDailyByPlatform(
@@ -166,94 +255,102 @@ export function computeHeatmapStats(records: DailyUsage[]): HeatmapStats {
   };
 }
 
-export function renderHeatmapSvg(
-  records: DailyUsage[],
-  options: RenderOptions = {},
+function renderMonthMarks(
+  dates: string[],
+  geometry: HeatmapGeometry,
+  theme: HeatmapTheme,
+  monthY: number,
 ): string {
-  const theme = options.theme ?? DEFAULT_THEME;
-  const timezone = options.timezone ?? "UTC";
-  const dates = dateRange(365, timezone);
-  const dailyTotals = aggregateByDate(records);
-  const values = dates.map((date) => dailyTotals.get(date) ?? 0);
-  const thresholds = computeLevels(values);
-  const stats = computeHeatmapStats(records);
-  const dailyByPlatform = aggregateDailyByPlatform(records);
-  const platformCount = stats.platforms.length;
-
-  const cell = 12;
-  const gap = 3;
-  const headerHeight = 50;
-  const monthY = headerHeight - 2;
-  const cellStartY = headerHeight + 8;
-  const weeks = Math.ceil(dates.length / 7);
-  const gridWidth = weeks * (cell + gap);
-  const gridHeight = 7 * (cell + gap);
-  const legendY = cellStartY + gridHeight + 12;
-  const leftPanelBottom = legendY + 28;
-  const statsPanelBottom = cellStartY + 206 + platformCount * 18 + 16;
-  const width = gridWidth + 300;
-  const height = Math.max(leftPanelBottom, statsPanelBottom);
-
-  const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   let monthMarks = "";
   let lastMonth = -1;
 
-  for (let week = 0; week < weeks; week += 1) {
+  if (geometry.mode === "strip") {
+    for (let index = 0; index < dates.length; index += 1) {
+      const date = dates[index];
+      if (!date) continue;
+      const month = new Date(`${date}T00:00:00Z`).getUTCMonth();
+      if (month !== lastMonth) {
+        const x = geometry.padding + index * (geometry.cell + geometry.gap);
+        monthMarks += `<text x="${x}" y="${monthY}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">${MONTH_LABELS[month]}</text>`;
+        lastMonth = month;
+      }
+    }
+    return monthMarks;
+  }
+
+  for (let week = 0; week < geometry.weeks; week += 1) {
     const weekStart = dates[week * 7];
     if (!weekStart) continue;
     const month = new Date(`${weekStart}T00:00:00Z`).getUTCMonth();
     if (month !== lastMonth) {
-      const x = 20 + week * (cell + gap);
-      monthMarks += `<text x="${x}" y="${monthY}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">${monthLabels[month]}</text>`;
+      const x = geometry.padding + week * (geometry.cell + geometry.gap);
+      monthMarks += `<text x="${x}" y="${monthY}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">${MONTH_LABELS[month]}</text>`;
       lastMonth = month;
     }
   }
 
+  return monthMarks;
+}
+
+function renderCells(
+  dates: string[],
+  dailyTotals: Map<string, number>,
+  dailyByPlatform: Map<string, Map<string, number>>,
+  thresholds: [number, number, number, number],
+  geometry: HeatmapGeometry,
+  theme: HeatmapTheme,
+  cellStartY: number,
+): string {
   let cells = "";
+
   for (let index = 0; index < dates.length; index += 1) {
     const date = dates[index]!;
     const value = dailyTotals.get(date) ?? 0;
     const level = levelForValue(value, thresholds);
-    const week = Math.floor(index / 7);
-    const day = index % 7;
-    const x = 20 + week * (cell + gap);
-    const y = cellStartY + day * (cell + gap);
     const tooltip = buildDayTooltip(date, value, dailyByPlatform.get(date));
 
-    cells += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${theme.levels[level]}"><title>${escapeXml(tooltip)}</title></rect>`;
+    if (geometry.mode === "strip") {
+      const x = geometry.padding + index * (geometry.cell + geometry.gap);
+      cells += `<rect x="${x}" y="${cellStartY}" width="${geometry.cell}" height="${geometry.cell}" rx="2" fill="${theme.levels[level]}"><title>${escapeXml(tooltip)}</title></rect>`;
+      continue;
+    }
+
+    const week = Math.floor(index / 7);
+    const day = index % 7;
+    const x = geometry.padding + week * (geometry.cell + geometry.gap);
+    const y = cellStartY + day * (geometry.cell + geometry.gap);
+    cells += `<rect x="${x}" y="${y}" width="${geometry.cell}" height="${geometry.cell}" rx="2" fill="${theme.levels[level]}"><title>${escapeXml(tooltip)}</title></rect>`;
   }
 
+  return cells;
+}
+
+function renderLegend(
+  theme: HeatmapTheme,
+  geometry: HeatmapGeometry,
+  legendY: number,
+): string {
+  const { cell, gap, padding } = geometry;
   const legend = theme.levels
     .map((color, index) => {
-      const x = 20 + index * (cell + gap);
-      const y = legendY;
-      return `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${color}"/>`;
+      const x = padding + index * (cell + gap);
+      return `<rect x="${x}" y="${legendY}" width="${cell}" height="${cell}" rx="2" fill="${color}"/>`;
     })
     .join("");
 
-  const platformBadges = renderPlatformBadges(stats.platforms, theme, 20, 32);
-  const platformRows = stats.platforms
-    .map((entry, index) => {
-      const y = 226 + index * 18;
-      const color = platformColor(entry.platform);
-      return `<circle cx="4" cy="${y - 4}" r="4" fill="${color}"/>
-    <text x="14" y="${y}" fill="${theme.text}" font-size="12" font-family="system-ui, sans-serif">${escapeXml(entry.label)}: ${formatNumber(entry.tokens)} (${entry.share.toFixed(1)}%)</text>`;
-    })
-    .join("\n    ");
-
-  const title = options.title ?? "AI Token Activity";
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="100%" height="100%" fill="${theme.background}" rx="8"/>
-  <text x="20" y="16" fill="${theme.text}" font-size="16" font-weight="600" font-family="system-ui, sans-serif">${escapeXml(title)}</text>
-  ${platformBadges}
-  ${monthMarks}
-  ${cells}
-  <text x="20" y="${legendY - 6}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">Less</text>
+  return `
+  <text x="${padding}" y="${legendY - 6}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">Less</text>
   ${legend}
-  <text x="${20 + 5 * (cell + gap) + 8}" y="${legendY + 3}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">More</text>
-  <g transform="translate(${gridWidth + 40}, ${cellStartY})">
+  <text x="${padding + 5 * (cell + gap) + 8}" y="${legendY + 3}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">More</text>`;
+}
+
+function renderStatsPanelSide(
+  stats: HeatmapStats,
+  theme: HeatmapTheme,
+  x: number,
+  y: number,
+): string {
+  return `<g transform="translate(${x}, ${y})">
     <text fill="${theme.text}" font-size="14" font-weight="600" font-family="system-ui, sans-serif">Stats</text>
     <text y="24" fill="${theme.muted}" font-size="12" font-family="system-ui, sans-serif">Total tokens</text>
     <text y="42" fill="${theme.text}" font-size="20" font-weight="700" font-family="system-ui, sans-serif">${formatNumber(stats.totalTokens)}</text>
@@ -263,10 +360,193 @@ export function renderHeatmapSvg(
     <text y="130" fill="${theme.text}" font-size="16" font-family="system-ui, sans-serif">${stats.currentStreak} days</text>
     <text y="156" fill="${theme.muted}" font-size="12" font-family="system-ui, sans-serif">Longest streak</text>
     <text y="174" fill="${theme.text}" font-size="16" font-family="system-ui, sans-serif">${stats.longestStreak} days</text>
-    <text y="206" fill="${theme.muted}" font-size="12" font-family="system-ui, sans-serif">Platforms</text>
-    ${platformRows}
-  </g>
+    <text y="206" fill="${theme.muted}" font-size="12" font-family="system-ui, sans-serif">Platforms tracked</text>
+    <text y="224" fill="${theme.text}" font-size="16" font-family="system-ui, sans-serif">${stats.platforms.length}</text>
+  </g>`;
+}
+
+function renderStatsPanelBelow(
+  stats: HeatmapStats,
+  theme: HeatmapTheme,
+  x: number,
+  y: number,
+  width: number,
+): { svg: string; height: number } {
+  const columns = [
+    { label: "Total tokens", value: formatNumber(stats.totalTokens), large: true },
+    { label: "Active days", value: String(stats.activeDays) },
+    { label: "Current streak", value: `${stats.currentStreak} days` },
+    { label: "Longest streak", value: `${stats.longestStreak} days` },
+  ];
+  const colWidth = width / columns.length;
+  let svg = `<text x="${x}" y="${y + 14}" fill="${theme.text}" font-size="14" font-weight="600" font-family="system-ui, sans-serif">Stats</text>`;
+
+  for (let index = 0; index < columns.length; index += 1) {
+    const column = columns[index]!;
+    const cx = x + index * colWidth;
+    const valueSize = column.large ? 20 : 16;
+    const valueWeight = column.large ? "700" : "400";
+
+    svg += `
+    <text x="${cx}" y="${y + 36}" fill="${theme.muted}" font-size="11" font-family="system-ui, sans-serif">${column.label}</text>
+    <text x="${cx}" y="${y + 36 + (column.large ? 24 : 20)}" fill="${theme.text}" font-size="${valueSize}" font-weight="${valueWeight}" font-family="system-ui, sans-serif">${escapeXml(column.value)}</text>`;
+  }
+
+  svg += `
+  <text x="${x}" y="${y + 88}" fill="${theme.muted}" font-size="11" font-family="system-ui, sans-serif">Platforms tracked</text>
+  <text x="${x + 120}" y="${y + 88}" fill="${theme.text}" font-size="14" font-family="system-ui, sans-serif">${stats.platforms.length}</text>`;
+
+  return { svg, height: 96 };
+}
+
+export function renderHeatmapSvg(
+  records: DailyUsage[],
+  options: RenderOptions = {},
+): string {
+  const theme = options.theme ?? DEFAULT_THEME;
+  const timezone = options.timezone ?? "UTC";
+  const days = options.days ?? DEFAULT_LOOKBACK_DAYS;
+  const geometry = computeGeometry(days);
+  const dates = dateRange(days, timezone);
+  const dailyTotals = aggregateByDate(records);
+  const values = dates.map((date) => dailyTotals.get(date) ?? 0);
+  const thresholds = computeLevels(values);
+  const stats = computeHeatmapStats(records);
+  const dailyByPlatform = aggregateDailyByPlatform(records);
+
+  const badgeBlock = renderPlatformBadges(
+    stats.platforms,
+    theme,
+    geometry.padding,
+    32,
+    geometry.contentWidth - geometry.padding * 2,
+  );
+  const headerHeight = 50 + Math.max(0, badgeBlock.height - 18);
+  const monthY = headerHeight - 2;
+  const cellStartY = headerHeight + 8;
+  const legendY =
+    geometry.mode === "strip"
+      ? cellStartY + geometry.cell + 12
+      : cellStartY + geometry.gridHeight + 12;
+
+  const monthMarks = renderMonthMarks(dates, geometry, theme, monthY);
+  const cells = renderCells(
+    dates,
+    dailyTotals,
+    dailyByPlatform,
+    thresholds,
+    geometry,
+    theme,
+    cellStartY,
+  );
+  const legend = renderLegend(theme, geometry, legendY);
+
+  const chartWidth =
+    geometry.mode === "wide"
+      ? geometry.gridWidth
+      : geometry.contentWidth - geometry.padding * 2;
+
+  let statsSvg = "";
+  let statsHeight = 0;
+  let barChartStartY = legendY + 24;
+
+  if (geometry.mode === "wide") {
+    statsSvg = renderStatsPanelSide(
+      stats,
+      theme,
+      geometry.gridWidth + geometry.padding + 20,
+      cellStartY,
+    );
+    statsHeight = 230;
+  } else {
+    barChartStartY = legendY + 24;
+    const statsPanel = renderStatsPanelBelow(
+      stats,
+      theme,
+      geometry.padding,
+      barChartStartY,
+      geometry.contentWidth - geometry.padding * 2,
+    );
+    statsSvg = statsPanel.svg;
+    statsHeight = statsPanel.height;
+    barChartStartY += statsHeight + 16;
+  }
+
+  const barChart = renderPlatformBarChart(
+    stats.platforms,
+    theme,
+    geometry.padding,
+    barChartStartY,
+    chartWidth,
+  );
+
+  const leftPanelBottom = barChartStartY + barChart.height;
+  const rightPanelBottom =
+    geometry.mode === "wide" ? cellStartY + statsHeight : 0;
+  const height =
+    Math.max(leftPanelBottom, rightPanelBottom) + geometry.padding;
+  const title = options.title ?? "LLM Token Activity";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.contentWidth}" height="${height}" viewBox="0 0 ${geometry.contentWidth} ${height}">
+  <rect width="100%" height="100%" fill="${theme.background}" rx="8"/>
+  <text x="${geometry.padding}" y="16" fill="${theme.text}" font-size="16" font-weight="600" font-family="system-ui, sans-serif">${escapeXml(title)}</text>
+  ${badgeBlock.svg}
+  ${monthMarks}
+  ${cells}
+  ${legend}
+  ${statsSvg}
+  ${barChart.svg}
 </svg>`;
+}
+
+function renderPlatformBarChart(
+  platforms: HeatmapStats["platforms"],
+  theme: HeatmapTheme,
+  startX: number,
+  startY: number,
+  chartWidth: number,
+): { svg: string; height: number } {
+  const titleHeight = 22;
+  const rowHeight = 30;
+  const labelWidth = 92;
+  const valueWidth = 96;
+  const barHeight = 10;
+  const barAreaWidth = Math.max(160, chartWidth - labelWidth - valueWidth - 8);
+  const maxTokens = platforms[0]?.tokens ?? 0;
+
+  if (platforms.length === 0) {
+    return {
+      svg: `<text x="${startX}" y="${startY + 12}" fill="${theme.muted}" font-size="11" font-family="system-ui, sans-serif">No platform data</text>`,
+      height: 20,
+    };
+  }
+
+  let svg = `<text x="${startX}" y="${startY + 12}" fill="${theme.text}" font-size="12" font-weight="600" font-family="system-ui, sans-serif">Platform Usage</text>`;
+
+  for (let index = 0; index < platforms.length; index += 1) {
+    const entry = platforms[index]!;
+    const rowY = startY + titleHeight + index * rowHeight;
+    const color = platformColor(entry.platform);
+    const barWidth =
+      maxTokens > 0 && entry.tokens > 0
+        ? Math.max(3, (entry.tokens / maxTokens) * barAreaWidth)
+        : 0;
+    const barX = startX + labelWidth;
+    const barY = rowY + 6;
+    const tooltip = `${entry.label}: ${formatNumber(entry.tokens)} (${entry.share.toFixed(1)}%)`;
+
+    svg += `
+  <text x="${startX}" y="${rowY + 14}" fill="${theme.text}" font-size="11" font-family="system-ui, sans-serif">${escapeXml(entry.label)}</text>
+  <rect x="${barX}" y="${barY}" width="${barAreaWidth}" height="${barHeight}" rx="3" fill="${theme.border}"/>
+  <rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" rx="3" fill="${color}"><title>${escapeXml(tooltip)}</title></rect>
+  <text x="${barX + barAreaWidth + 8}" y="${rowY + 14}" fill="${theme.muted}" font-size="10" font-family="system-ui, sans-serif">${formatNumber(entry.tokens)} (${entry.share.toFixed(1)}%)</text>`;
+  }
+
+  return {
+    svg,
+    height: titleHeight + platforms.length * rowHeight + 8,
+  };
 }
 
 function renderPlatformBadges(
@@ -274,24 +554,38 @@ function renderPlatformBadges(
   theme: HeatmapTheme,
   startX: number,
   y: number,
-): string {
+  maxWidth: number,
+): { svg: string; height: number } {
   if (platforms.length === 0) {
-    return `<text x="${startX}" y="${y}" fill="${theme.muted}" font-size="11" font-family="system-ui, sans-serif">No platform data</text>`;
+    return {
+      svg: `<text x="${startX}" y="${y}" fill="${theme.muted}" font-size="11" font-family="system-ui, sans-serif">No platform data</text>`,
+      height: 18,
+    };
   }
 
   let x = startX;
+  let rowY = y;
   let badges = "";
+  const rowHeight = 22;
 
   for (const entry of platforms) {
     const label = entry.label;
     const pillWidth = label.length * 6.5 + 28;
     const color = platformColor(entry.platform);
 
-    badges += `<rect x="${x}" y="${y - 12}" width="${pillWidth}" height="18" rx="9" fill="${theme.border}"/>
-    <circle cx="${x + 10}" cy="${y - 3}" r="4" fill="${color}"/>
-    <text x="${x + 18}" y="${y + 1}" fill="${theme.text}" font-size="10" font-family="system-ui, sans-serif">${escapeXml(label)}</text>`;
+    if (x + pillWidth > startX + maxWidth && x > startX) {
+      x = startX;
+      rowY += rowHeight;
+    }
+
+    badges += `<rect x="${x}" y="${rowY - 12}" width="${pillWidth}" height="18" rx="9" fill="${theme.border}"/>
+    <circle cx="${x + 10}" cy="${rowY - 3}" r="4" fill="${color}"/>
+    <text x="${x + 18}" y="${rowY + 1}" fill="${theme.text}" font-size="10" font-family="system-ui, sans-serif">${escapeXml(label)}</text>`;
     x += pillWidth + 8;
   }
 
-  return badges;
+  return {
+    svg: badges,
+    height: rowY - y + 12,
+  };
 }

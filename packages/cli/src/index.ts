@@ -10,13 +10,16 @@ import {
   DEFAULT_CONFIG_PATH,
   aggregateByPlatform,
   defaultConfig,
+  filterRecordsByDays,
   filterRecordsByYear,
   formatDateInTimezone,
   loadConfig,
   loadStore,
+  parseDaysArg,
   parseSinceArg,
   sanitizeForPublish,
   saveStore,
+  sinceDateFromDays,
   sumTokens,
   upsertRecords,
 } from "@token-board/core";
@@ -42,10 +45,20 @@ function getGlobalConfigPath(command: Command): string | undefined {
   return (command.parent?.opts() as { config?: string } | undefined)?.config;
 }
 
+function getGlobalDays(command: Command, config: Awaited<ReturnType<typeof loadConfig>>): number {
+  const opts = command.parent?.opts() as { days?: string } | undefined;
+  return parseDaysArg(opts?.days, config.days);
+}
+
 program
   .name("token-board")
   .description("Track AI token usage and publish GitHub-style activity heatmaps")
-  .option("-c, --config <path>", "Path to config file");
+  .option("-c, --config <path>", "Path to config file")
+  .option(
+    "-d, --days <number>",
+    "Number of days to collect and display (7-365)",
+    "30",
+  );
 
 program
   .command("init")
@@ -111,10 +124,17 @@ program
 program
   .command("collect")
   .description("Collect usage from enabled platforms")
-  .option("--since <duration>", "Lookback window", "365d")
-  .action(async (options: { since: string }, command: Command) => {
+  .option("--since <duration>", "Deprecated: use --days instead (e.g. 30d)")
+  .action(async (options: { since?: string }, command: Command) => {
     const config = await loadConfig(getGlobalConfigPath(command));
-    const since = parseSinceArg(options.since);
+    let days = getGlobalDays(command, config);
+    if (options.since) {
+      const since = parseSinceArg(options.since);
+      days = parseDaysArg(
+        Math.ceil((Date.now() - since.getTime()) / 86_400_000),
+      );
+    }
+    const since = sinceDateFromDays(days, config.timezone);
     const collectors = getCollectors(config);
     const results = await runCollectors(collectors, {
       timezone: config.timezone,
@@ -160,13 +180,15 @@ program
   .option("-o, --output <path>", "Output SVG path")
   .action(async (options: { year?: string; output?: string }, command: Command) => {
     const config = await loadConfig(getGlobalConfigPath(command));
+    const days = getGlobalDays(command, config);
     const store = await loadStore(config.dataPath);
-    const records = options.year
+    const baseRecords = options.year
       ? filterRecordsByYear(store.records, Number(options.year))
-      : store.records;
-    const svg = renderHeatmapSvg(records, {
+      : filterRecordsByDays(store.records, days, store.timezone);
+    const svg = renderHeatmapSvg(baseRecords, {
       timezone: store.timezone,
       year: options.year ? Number(options.year) : undefined,
+      days: options.year ? 365 : days,
     });
 
     const outputPath = options.output ?? config.outputPath;
@@ -207,9 +229,18 @@ program
   .option("--dry-run", "Only render files without writing publish manifest")
   .action(async (options: { dryRun?: boolean }, command: Command) => {
     const config = await loadConfig(getGlobalConfigPath(command));
+    const days = getGlobalDays(command, config);
     const store = await loadStore(config.dataPath);
-    const publicRecords = sanitizeForPublish(store.records, config.publish);
-    const svg = renderHeatmapSvg(publicRecords, { timezone: store.timezone });
+    const windowRecords = filterRecordsByDays(
+      store.records,
+      days,
+      store.timezone,
+    );
+    const publicRecords = sanitizeForPublish(windowRecords, config.publish);
+    const svg = renderHeatmapSvg(publicRecords, {
+      timezone: store.timezone,
+      days,
+    });
 
     const svgPath = config.github?.svgPath ?? config.outputPath;
     const publishDir = path.dirname(config.dataPath);

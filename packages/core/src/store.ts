@@ -3,6 +3,7 @@ import path from "node:path";
 import type { DailyUsage, UsageStore } from "./schema.js";
 import { createEmptyStore } from "./schema.js";
 import { mergeDailyRecords } from "./aggregate.js";
+import { dateRange } from "./dates.js";
 
 export async function loadStore(filePath: string): Promise<UsageStore> {
   try {
@@ -50,4 +51,21 @@ export function filterRecordsByYear(
 ): DailyUsage[] {
   const prefix = `${year}-`;
   return records.filter((record) => record.date.startsWith(prefix));
+}
+
+export function filterRecordsByDays(
+  records: DailyUsage[],
+  days: number,
+  timezone: string,
+): DailyUsage[] {
+  const dates = dateRange(days, timezone);
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  if (!first || !last) {
+    return records;
+  }
+
+  return records.filter(
+    (record) => record.date >= first && record.date <= last,
+  );
 }

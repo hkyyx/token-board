@@ -1,3 +1,48 @@
+export const MIN_LOOKBACK_DAYS = 7;
+export const MAX_LOOKBACK_DAYS = 365;
+export const DEFAULT_LOOKBACK_DAYS = 30;
+
+export function clampDays(days: number): number {
+  const rounded = Math.floor(days);
+  if (!Number.isFinite(rounded)) {
+    throw new Error(
+      `Days must be an integer between ${MIN_LOOKBACK_DAYS} and ${MAX_LOOKBACK_DAYS}.`,
+    );
+  }
+  if (rounded < MIN_LOOKBACK_DAYS || rounded > MAX_LOOKBACK_DAYS) {
+    throw new Error(
+      `Days must be between ${MIN_LOOKBACK_DAYS} and ${MAX_LOOKBACK_DAYS}.`,
+    );
+  }
+  return rounded;
+}
+
+export function parseDaysArg(
+  value: string | number | undefined,
+  fallback = DEFAULT_LOOKBACK_DAYS,
+): number {
+  if (value === undefined || value === "") {
+    return clampDays(fallback);
+  }
+
+  const days = typeof value === "number" ? value : Number.parseInt(value, 10);
+  if (!Number.isFinite(days)) {
+    throw new Error(
+      `Invalid --days value: ${value}. Use an integer between ${MIN_LOOKBACK_DAYS} and ${MAX_LOOKBACK_DAYS}.`,
+    );
+  }
+
+  return clampDays(days);
+}
+
+export function sinceDateFromDays(days: number, timezone: string): Date {
+  const firstDate = dateRange(days, timezone)[0];
+  if (!firstDate) {
+    return new Date(Date.now() - days * 86_400_000);
+  }
+  return new Date(`${firstDate}T00:00:00.000Z`);
+}
+
 export function formatDateInTimezone(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,

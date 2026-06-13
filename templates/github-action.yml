@@ -22,7 +22,7 @@ jobs:
         run: npm ci
 
       - name: Collect usage
-        run: npx token-board collect --since 365d
+        run: npx token-board collect --days 30
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_ADMIN_KEY: ${{ secrets.ANTHROPIC_ADMIN_KEY }}
