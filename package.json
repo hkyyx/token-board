@@ -11,7 +11,7 @@
     "action"
   ],
   "scripts": {
-    "build": "tsc -b tsconfig.json",
+    "build": "tsc -b tsconfig.json && node -e \"require('fs').chmodSync('packages/cli/dist/index.js', 0o755)\"",
     "dev": "npm run build && node packages/cli/dist/index.js",
     "typecheck": "tsc -b"
   },

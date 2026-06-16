@@ -7,15 +7,15 @@ async function run(): Promise<void> {
 
   const configFlag = configPath ? `--config ${configPath}` : "";
 
-  await exec("npx", [
-    "token-board",
+  await exec("node", [
+    "packages/cli/dist/index.js",
     "collect",
     "--days",
     days,
     ...(configFlag ? configFlag.split(" ") : []),
   ]);
-  await exec("npx", [
-    "token-board",
+  await exec("node", [
+    "packages/cli/dist/index.js",
     "publish",
     "--days",
     days,
